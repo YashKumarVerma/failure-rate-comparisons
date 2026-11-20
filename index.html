@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Failure Rate Calculators</title>
+<style>
+:root{--bg:#f6f6f3;--panel:#fff;--fg:#1d1d1b;--muted:#77756e;--line:#e2e1db;--grid:#ecebe5;--accent:#2a78d6;--good:#2f9e5b;--bad:#d6455d}
+@media (prefers-color-scheme:dark){:root{--bg:#131312;--panel:#1d1d1b;--fg:#ecebe6;--muted:#8f8d86;--line:#34332f;--grid:#272724;--accent:#5b9cf0;--good:#4cc27c;--bad:#f0707f}}
+:root[data-slashdocs-theme="light"]{--bg:#f6f6f3;--panel:#fff;--fg:#1d1d1b;--muted:#77756e;--line:#e2e1db;--grid:#ecebe5;--accent:#2a78d6;--good:#2f9e5b;--bad:#d6455d;color-scheme:light}
+:root[data-slashdocs-theme="dark"]{--bg:#131312;--panel:#1d1d1b;--fg:#ecebe6;--muted:#8f8d86;--line:#34332f;--grid:#272724;--accent:#5b9cf0;--good:#4cc27c;--bad:#f0707f;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif}
+header{position:sticky;top:0;z-index:3;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center}
+header h1{font-size:15px;margin:0 8px 0 0}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;padding:16px}
+@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
+.panel{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:16px}
+.panel h2{font-size:13px;margin:0 0 8px;display:flex;justify-content:space-between;color:var(--muted);font-weight:600}
+.panel .sub{margin:-4px 0 8px;font-size:12px;color:var(--muted)}
+canvas{width:100%;height:240px;display:block}
+.ctrl{display:grid;grid-template-columns:90px 1fr 76px;gap:8px;align-items:center;font-size:13px}
+.ctrl input[type=number],select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:3px 5px;font:inherit}
+.ctrl input[type=range]{width:100%;accent-color:var(--accent)}
+header .ctrl{width:340px;max-width:100%}
+button{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:4px 10px;font:inherit;cursor:pointer}
+.card{--c:var(--accent);background:color-mix(in srgb,var(--c) 6%,var(--panel));border:1px solid color-mix(in srgb,var(--c) 30%,var(--line));border-left:4px solid var(--c);border-radius:8px;padding:10px 12px 12px;margin-bottom:12px}
+.card .head{display:flex;align-items:baseline;gap:8px}
+.card .head b{flex:1;font-size:14px}
+.card .head b small{color:var(--muted);font-weight:500;margin-left:4px}
+.card .val{font-variant-numeric:tabular-nums;font-weight:700;font-size:20px;color:var(--c)}
+.card .x{border:0;background:none;color:var(--muted);font-size:16px;padding:0 2px}
+.card .x:hover{color:var(--fg)}
+.badges{display:flex;gap:6px;margin:4px 0 8px}
+.badges span{font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--panel)}
+.badges .k{border-color:var(--c);color:var(--c)}
+.card code{display:block;font:12px ui-monospace,Menlo,monospace;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 8px;margin-bottom:10px;white-space:pre-wrap}
+.card .params{display:grid;gap:8px}
+.card .ctrl{grid-template-columns:80px 1fr 64px}
+.card input[type=range]{accent-color:var(--c)}
+.card details{margin-top:8px;font-size:12px;color:var(--muted)}
+.card summary{cursor:pointer}
+.card .hint{font-size:12px;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
+.card .hint b{color:var(--fg);font-weight:600}
+.card .redis{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;font-size:12px}
+.card .redis .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+.card .redis code{margin:0 0 6px;color:var(--muted)}
+.card .redis .live{font-variant-numeric:tabular-nums;color:var(--muted)}.card .redis .live b{color:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;margin-top:6px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.stat{color:var(--muted);font-variant-numeric:tabular-nums}
+.tip{text-decoration:underline dotted var(--muted);text-underline-offset:3px;cursor:help}
+th .tip::after{content:"?";display:inline-grid;place-items:center;width:13px;height:13px;margin-left:4px;border-radius:50%;border:1px solid var(--muted);font-size:9px;text-decoration:none;vertical-align:1px}
+td[data-tip]{cursor:help}
+#pop{position:fixed;z-index:10;max-width:340px;background:var(--fg);color:var(--bg);padding:9px 11px;border-radius:7px;font-size:12px;line-height:1.5;white-space:pre-line;pointer-events:none;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);text-transform:none;letter-spacing:0;font-weight:400;text-align:left}
+#pop b{font-weight:700}
+.tt{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.15);display:none;white-space:nowrap;font-variant-numeric:tabular-nums;z-index:2}
+.tt div{display:flex;gap:10px;justify-content:space-between}.tt i{display:inline-block;width:10px;height:3px;margin-right:5px;vertical-align:middle}
+.tt .h{color:var(--muted);margin-bottom:3px}
+.guide{font-size:13px}.guide summary{cursor:pointer;font-weight:600}.guide li{margin:6px 0}.guide b{font-weight:600}
+.add{display:flex;gap:8px;margin-bottom:12px}.add select{flex:1}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+th:first-child,td:first-child{text-align:left}
+td i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+td.best{color:var(--good);font-weight:700}td.worst{color:var(--bad)}
+.presets{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.presets button{font-size:12.5px}.presets button.on{border-color:var(--accent);color:var(--accent)}
+.chk{font-size:13px;display:flex;gap:6px;align-items:center}
+
+nav.tabs{display:flex;gap:4px;margin-right:8px}
+a[data-go]{cursor:pointer;color:var(--accent);text-decoration:underline}
+nav.tabs a{color:var(--muted);text-decoration:none;padding:4px 10px;border-radius:5px;border:1px solid transparent;font-size:13px}
+nav.tabs a.on{color:var(--fg);border-color:var(--line);background:var(--bg)}
+#handover{display:none;padding:16px}
+body.handover main, body.handover header > :not(h1):not(nav){display:none !important}
+body.handover #handover{display:block}
+.doc{max-width:900px;margin:0 auto;font-size:14.5px;line-height:1.6}
+.doc [id]{scroll-margin-top:72px}
+.doc h1{font-size:22px;margin:8px 0}.doc h2{font-size:17px;margin:32px 0 8px;padding-top:8px;border-top:1px solid var(--line)}.doc h3{font-size:13px;margin:16px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.doc .lead{color:var(--muted)}.doc a{color:var(--accent)}
+.doc code{font:12.5px ui-monospace,Menlo,monospace;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.doc .code{position:relative;margin:6px 0 12px}
+.doc pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:0}
+.doc pre code{border:0;padding:0;background:none;font-size:12.5px;line-height:1.5}
+.doc .lang{position:absolute;top:6px;right:62px;font-size:10px;text-transform:uppercase;color:var(--muted)}
+.doc .copy{position:absolute;top:4px;right:6px;font-size:11px;padding:1px 8px}
+.doc .callout{background:color-mix(in srgb,var(--good) 10%,var(--panel));border:1px solid color-mix(in srgb,var(--good) 40%,var(--line));border-radius:8px;padding:12px 14px;margin:16px 0}
+.doc .note{font-size:13px;color:var(--muted)}
+.doc dl{display:grid;grid-template-columns:90px 1fr;gap:4px 12px;font-size:13.5px}.doc dt{color:var(--muted)}.doc dd{margin:0}
+.doc .pill{font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:999px;border:1px solid var(--good);color:var(--good);vertical-align:3px;margin-left:6px}
+.doc .pill.no{border-color:var(--bad);color:var(--bad)}
+.doc .formula{font:15px ui-monospace,Menlo,monospace;text-align:center;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.doc table.cmp td,.doc table.cmp th{text-align:left;white-space:normal;vertical-align:top;font-size:13px}
+.doc td.yes{color:var(--good);font-weight:600}.doc td.no{color:var(--bad);font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <h1>Failure rate calculators</h1>
+  <nav class=tabs><a data-go="" tabindex="0" role="link">Simulator</a><a data-go="handover" tabindex="0" role="link">Dev handover</a></nav>
+  <div id="inputs" style="display:grid;gap:6px"></div>
+  <div id="load" style="display:grid;gap:6px"></div>
+  <div id="presets" class="presets"><span class="stat">Presets:</span></div>
+  <label><span class=tip data-tip="poisson: random gaps between events, like real traffic (noisy). uniform: perfectly even spacing (isolates algorithm behaviour from noise).">arrivals</span> <select id="mode"><option>poisson</option><option>uniform</option></select></label>
+  <label><span class=tip data-tip="Simulated seconds per real second. Algorithms only see simulated time.">speed</span> <select id="speed"><option>1</option><option>2</option><option>5</option><option>10</option></select>×</label>
+  <button id="pause">Pause</button><button id="reset">Reset</button>
+  <span class="stat" id="clock"></span>
+</header>
+<main>
+  <section>
+    <div class="panel"><h2><span>Cost vs accuracy</span><span id="costScope"></span></h2>
+      <p class=sub>Redis load per estimator at the current traffic, reads/s and stream count. Green = best in column, red = worst. Hover column headers for definitions.</p>
+      <div class=tbl><table><thead><tr>
+        <th>Estimator</th>
+        <th><span class=tip data-tip="<b>RTT/s — round trips per second</b>
+One request/response between your app and Redis. A pipeline or a single EVALSHA counts as 1, however many commands it carries.
+Drives network load and adds one Redis latency to every request path that writes.
+Example: 90 ok + 10 fail + 1 read = 101 RTT/s per stream.">RTT/s</span></th>
+        <th><span class=tip data-tip="<b>cmds/s — Redis commands per second</b>
+Every command Redis executes, including those run inside Lua scripts.
+Redis runs commands on one thread per shard, so this is its throughput load. A single node handles roughly 100k–200k simple commands/s.">cmds/s</span></th>
+        <th><span class=tip data-tip="<b>work/s — estimated server-side work</b>
+Rough Redis CPU proxy: hash fields or keys touched per second, with sorted-set operations costed at log₂(N) for N entries.
+Two designs with equal cmds/s can differ 10× here (sorted set vs counter).">work/s</span></th>
+        <th><span class=tip data-tip="<b>memory — Redis RAM at steady state</b>
+Total across all streams.
+zset stores every event inside the window (~120 B each, measured), so it grows with traffic × W.
+Counters and EWMAs are a fixed 60–150 B per stream (A and B measured on Redis 7 with MEMORY USAGE: 144 B and 120 B).">memory</span></th>
+        <th><span class=tip data-tip="<b>ticker — needs a background job</b>
+A job must wake every interval and update every key. With many hosts that needs a leader or scheduler, and it costs Redis load even at zero traffic.">ticker</span></th>
+        <th><span class=tip data-tip="<b>MAE — mean absolute error, as % of truth</b>
+Σ|estimate − truth| ÷ Σ|truth| over the visible 60 s.
+Normalised so ratio and rate estimators are comparable: 10% means the estimate is off by a tenth of the real value on average.
+Includes Poisson noise and the lag after you move a slider. Hover a cell for the raw value in its own unit.">MAE</span></th>
+        <th><span class=tip data-tip="<b>max err — worst-case error, as % of truth</b>
+Largest |estimate − truth| over the visible 60 s, divided by the average truth.
+After a step change (e.g. an error spike) this is the lag that decides how late a breaker trips.">max err</span></th>
+      </tr></thead><tbody id="costBody"></tbody></table></div>
+    </div>
+    <div class="panel"><h2><span>Error ratio (level)</span><span id="truthRatio"></span></h2><p class=sub>Fraction of requests failing. Dashed line = the ratio you configured. Dots = what actually happened in each 0.5s bin (failures / total), including Poisson noise. Hover for exact values.</p><canvas id="cvRatio"></canvas><div class="legend" id="lgRatio"></div></div>
+    <div class="panel"><h2><span>Rate (events/s)</span><span id="truthRate"></span></h2><p class=sub>Events per second for the selected signal. Dashed lines = true rates. Hover for exact values.</p><canvas id="cvRate"></canvas><div class="legend" id="lgRate"></div></div>
+    <div class="panel"><h2><span>Redis commands/s (all streams)</span><span id="costTotal"></span></h2><p class=sub>Commands per second each estimator would send to Redis over time. Move the traffic sliders to see which designs scale with traffic and which do not.</p><canvas id="cvCost"></canvas><div class="legend" id="lgCost"></div></div>
+    <div class="panel"><h2><span>Error vs truth, % (rolling 10 s)</span><span class=stat>lower is better</span></h2><p class=sub>Σ|estimate − truth| ÷ Σ|truth| over the last 10 s, for every estimator on one scale. Spikes after a slider move show lag; a high floor shows noise. Gaps = truth is 0, so relative error is undefined.</p><canvas id="cvErr"></canvas><div class="legend" id="lgErr"></div></div>
+    <details class="panel guide" open><summary>What to try</summary><ol>
+      <li><b>Kill traffic.</b> Set both sliders to 0. Level estimators (per-event) freeze at the last value; rate estimators decay to 0; fixed-tick ratio becomes 0/0 and the line disappears. Redis cost: per-event designs drop to read cost only; fixed-tick keeps paying for ticks.</li>
+      <li><b>Error spike.</b> Jump failure/s from 10 to 100 for a few seconds, then back. Compare how fast each line reacts and how long it takes to forget (max err column, and the error chart). The sliding window has a hard edge; EWMAs fade.</li>
+      <li><b>Scale traffic.</b> Push success/s to 1000 with the sliding window on <code>zset</code>. Memory grows with traffic × W; switch to <code>buckets</code> and watch memory flatten while reads get more expensive.</li>
+      <li><b>Read per request.</b> Tick "reads = traffic" (e.g. a circuit breaker checks on every call). Bucketed sliding windows multiply cost by W / bucket per read.</li>
+      <li><b>Low traffic.</b> Drop success/s to 5 and failure/s to 1. Per-event fixed α slows to a crawl (memory is in events, not seconds); time-decayed τ keeps the same reaction time but gets noisier.</li>
+      <li><b>Tick vs τ.</b> Fixed-tick with interval Δ and α behaves like τ ≈ −Δ / ln(1 − α). The card shows the equivalent τ live.</li>
+    </ol></details>
+  </section>
+  <aside>
+    <div class="add"><select id="addSel"></select><button id="addBtn">Add</button></div>
+    <div id="cards"></div>
+  </aside>
+</main>
+
+<article id="handover">
+  <div class=doc>
+  <h1>Error rate on Redis: implementation handover</h1>
+  <p class=lead>Six ways to track a per-stream error rate in Redis, with the exact Redis commands, Lua scripts and trade-offs. Scripts were run against Redis 7. The <a data-go="" tabindex="0" role="link">Simulator</a> tab shows how each one behaves and what it costs at your traffic.</p>
+
+  <div class=callout><b>Recommendation: A. Decayed counts.</b> One hash per stream, one Lua call per request (or per batch), no background job. It gives the error ratio <i>and</i> the request rate, so a breaker can refuse to trip on low volume. With no traffic the ratio holds its last value while the rates decay to 0, which is the behaviour you want from both.</div>
+
+  <h2>At a glance</h2>
+  <div class=tbl><table class=cmp><thead><tr><th>Algorithm</th><th>Write, per request</th><th>Read</th><th>Memory / stream</th><th>Background job</th><th>Use it?</th></tr></thead><tbody>
+    <tr><td><a data-go="h-a" tabindex="0" role="link">A. Decayed counts</a></td><td>1 RTT · EVALSHA (HMGET, HSET, EXPIRE)</td><td>1 RTT · EVALSHA (HMGET)</td><td>~144 B</td><td>no</td><td class=yes>Yes, default</td></tr>
+    <tr><td><a data-go="h-b" tabindex="0" role="link">B. Time-decayed level</a></td><td>1 RTT · EVALSHA (HMGET, HSET, EXPIRE)</td><td>1 RTT · HGET</td><td>~120 B</td><td>no</td><td>Only if you never need volume</td></tr>
+    <tr><td><a data-go="h-c" tabindex="0" role="link">C. Fixed-tick</a></td><td>1 RTT · HINCRBY</td><td>1 RTT · HMGET</td><td>~150 B</td><td><b>yes</b>: 1 EVALSHA per stream per tick + leader</td><td>When writes must be a single O(1) command</td></tr>
+    <tr><td><a data-go="h-d" tabindex="0" role="link">D. Sliding window, zset</a></td><td>1 RTT · EVALSHA (ZADD, ZREMRANGEBYSCORE, PEXPIRE), ×2 on failure</td><td>1 RTT · EVALSHA (ZCOUNT ×2)</td><td><b>~120 B × requests in W</b></td><td>no</td><td>Only for exact audit counts at low traffic</td></tr>
+    <tr><td><a data-go="h-e" tabindex="0" role="link">E. Sliding window, buckets</a></td><td>1 RTT · INCR + EXPIRE, ×2 on failure</td><td>1 RTT · MGET of 2·W/bucket keys</td><td>~70 B × 2·W/bucket</td><td>no</td><td>When you need a hard window edge</td></tr>
+    <tr><td><a data-go="h-f" tabindex="0" role="link">F. Per-event fixed α</a></td><td>1 RTT · EVALSHA (GET, SET)</td><td>1 RTT · GET</td><td>~60 B</td><td>no</td><td class=no>No</td></tr>
+  </tbody></table></div>
+
+  <h2>Rules that apply to every option</h2>
+  <ul>
+    <li><b>Use Redis's clock, not the app's.</b> Scripts call <code>TIME</code> so every host shares one clock. Needs Redis ≥ 5 (scripts replicate effects by default).</li>
+    <li><b>Hash-tag the stream id</b> (<code>err:{merchant_42}</code>). All keys a script touches must be in one cluster slot.</li>
+    <li><b>Return floats as strings.</b> Redis converts Lua numbers to integers in replies, so <code>0.1</code> would come back as <code>0</code>.</li>
+    <li><b>Load scripts with go-redis <code>redis.NewScript</code></b>. <code>Run</code> sends EVALSHA and falls back to EVAL after a restart or failover.</li>
+    <li><b>Set a TTL on every key</b> so idle streams clean themselves up. For decayed state, 5τ loses nothing (&lt;1% weight left).</li>
+    <li><b>Hot streams.</b> All writes for one stream run one at a time on one shard. Above a few thousand requests/s per stream, pre-aggregate per host (see <a data-go="h-scale" tabindex="0" role="link">Scaling</a>).</li>
+  </ul>
+
+  <h2 id="h-a">A. Decayed counts <span class=pill>recommended</span></h2>
+  <p>Keep two exponentially decayed counters per stream: failures <code>f</code> and all requests <code>a</code>. Each request adds <code>1/τ</code>; both decay by <code>e^(−Δt/τ)</code>. Then <code>a</code> ≈ requests/s, <code>f</code> ≈ failures/s, and <code>f / a</code> = error ratio. Because both decay by the same factor, the ratio does not change during silence.</p>
+  <dl><dt>Key</dt><dd><code>err:{stream}</code> hash: <code>f</code>, <code>a</code>, <code>ts</code></dd>
+      <dt>Params</dt><dd><code>τ</code> seconds (reaction time), <code>ttl</code> = 5τ</dd>
+      <dt>Batching</dt><dd>Pass counts: <code>ARGV = failures, requests</code>. One request = <code>1,1</code> or <code>0,1</code>.</dd></dl>
+  <h3>Write</h3><div class=code><span class=lang>lua</span><button class=copy>Copy</button><pre><code>-- KEYS[1] = err:{stream}
+-- ARGV[1] = failures   ARGV[2] = requests (1/1 or 0/1 per event, or batched counts)
+-- ARGV[3] = tau (s)    ARGV[4] = ttl (s)
+local t = redis.call(&#x27;TIME&#x27;)
+local now = tonumber(t[1]) + tonumber(t[2]) / 1e6
+local nf, n, tau = tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3])
+local s = redis.call(&#x27;HMGET&#x27;, KEYS[1], &#x27;f&#x27;, &#x27;a&#x27;, &#x27;ts&#x27;)
+local f, a, ts = tonumber(s[1]) or 0, tonumber(s[2]) or 0, tonumber(s[3]) or now
+local k = math.exp(-math.max(0, now - ts) / tau)
+f = f * k + nf / tau
+a = a * k + n / tau
+redis.call(&#x27;HSET&#x27;, KEYS[1], &#x27;f&#x27;, tostring(f), &#x27;a&#x27;, tostring(a), &#x27;ts&#x27;, tostring(now))
+redis.call(&#x27;EXPIRE&#x27;, KEYS[1], ARGV[4])
+return tostring(a &gt; 0 and f / a or 0)</code></pre></div>
+  <h3>Read</h3><div class=code><span class=lang>lua</span><button class=copy>Copy</button><pre><code>-- KEYS[1] = err:{stream}   ARGV[1] = tau (s)
+-- returns { error_ratio, requests_per_s, failures_per_s } as strings
+local t = redis.call(&#x27;TIME&#x27;)
+local now = tonumber(t[1]) + tonumber(t[2]) / 1e6
+local s = redis.call(&#x27;HMGET&#x27;, KEYS[1], &#x27;f&#x27;, &#x27;a&#x27;, &#x27;ts&#x27;)
+if not s[2] then return { &#x27;0&#x27;, &#x27;0&#x27;, &#x27;0&#x27; } end
+local k = math.exp(-math.max(0, now - tonumber(s[3])) / tonumber(ARGV[1]))
+local f, a = tonumber(s[1]) * k, tonumber(s[2]) * k
+return { tostring(f / a), tostring(a), tostring(f) }</code></pre></div>
+  <p class=note>If you only need the ratio, a plain <code>HMGET err:{stream} f a</code> and <code>f / a</code> on the client is enough: decay cancels out of the ratio. Use the script when you also need the rate (volume guard).</p>
+  <h3>Go</h3><div class=code><span class=lang>go</span><button class=copy>Copy</button><pre><code>// go-redis v9. Script.Run uses EVALSHA and falls back to EVAL on NOSCRIPT.
+var (
+	recordErr = redis.NewScript(dcRecordLua) // dc_record.lua above
+	readErr   = redis.NewScript(dcReadLua)   // dc_read.lua above
+)
+
+const (
+	tau    = 10        // seconds; see &quot;Choosing τ&quot;
+	ttl    = 5 * tau   // after 5τ the state is &lt;1% of its value
+	minRPS = 2.0       // volume guard: don&#x27;t judge a stream on a handful of requests
+)
+
+func key(stream string) []string { return []string{&quot;err:{&quot; + stream + &quot;}&quot;} }
+
+// Record one request outcome. For high traffic, batch per host and pass counts instead.
+func Record(ctx context.Context, rdb redis.Scripter, stream string, failed bool) error {
+	f := 0
+	if failed {
+		f = 1
+	}
+	return recordErr.Run(ctx, rdb, key(stream), f, 1, tau, ttl).Err()
+}
+
+// ErrorRate returns the smoothed error ratio and request rate for a stream.
+func ErrorRate(ctx context.Context, rdb redis.Scripter, stream string) (ratio, rps float64, err error) {
+	v, err := readErr.Run(ctx, rdb, key(stream), tau).StringSlice()
+	if err != nil {
+		return 0, 0, err
+	}
+	ratio, _ = strconv.ParseFloat(v[0], 64)
+	rps, _ = strconv.ParseFloat(v[1], 64)
+	return ratio, rps, nil
+}
+
+func ShouldTrip(ratio, rps, threshold float64) bool {
+	return rps &gt;= minRPS &amp;&amp; ratio &gt;= threshold
+}</code></pre></div>
+
+  <h2 id="h-b">B. Time-decayed level</h2>
+  <p>A single EWMA of the outcome (<code>x = 1</code> failure, <code>0</code> success), weighted by time since the previous request. Same cost as A, but it stores no volume, so after a cold start (or TTL expiry) the first request sets the ratio to 0% or 100%. You cannot guard against that without a second counter, at which point you have built A.</p>
+  <dl><dt>Key</dt><dd><code>lvl:{stream}</code> hash: <code>v</code>, <code>ts</code></dd><dt>Read</dt><dd><code>HGET lvl:{stream} v</code></dd></dl>
+  <div class=code><span class=lang>lua</span><button class=copy>Copy</button><pre><code>-- KEYS[1] = lvl:{stream}   ARGV[1] = 1 if failure else 0   ARGV[2] = tau (s)   ARGV[3] = ttl (s)
+local t = redis.call(&#x27;TIME&#x27;)
+local now = tonumber(t[1]) + tonumber(t[2]) / 1e6
+local x, tau = tonumber(ARGV[1]), tonumber(ARGV[2])
+local s = redis.call(&#x27;HMGET&#x27;, KEYS[1], &#x27;v&#x27;, &#x27;ts&#x27;)
+local v = tonumber(s[1])
+if v == nil then
+  v = x
+else
+  v = v + (1 - math.exp(-math.max(0, now - tonumber(s[2])) / tau)) * (x - v)
+end
+redis.call(&#x27;HSET&#x27;, KEYS[1], &#x27;v&#x27;, tostring(v), &#x27;ts&#x27;, tostring(now))
+redis.call(&#x27;EXPIRE&#x27;, KEYS[1], ARGV[3])
+return tostring(v)</code></pre></div>
+
+  <h2 id="h-c">C. Fixed-tick EWMA</h2>
+  <p>Requests only increment a counter. A single ticker (one elected host) runs a script per stream every interval Δ that turns the counts into a rate and smooths it with α. Equivalent τ ≈ −Δ / ln(1 − α); Δ = 1 s, α = 0.2 gives τ ≈ 4.5 s.</p>
+  <ul>
+    <li>The cheapest write path: one O(1) command, no Lua.</li>
+    <li>The ticker must know every active stream: keep a registry (<code>SADD streams &lt;id&gt;</code>, one more command per request) or a known list.</li>
+    <li>The ticker costs Redis load even with zero traffic: streams ÷ Δ scripts/s.</li>
+    <li>If the ticker stalls, the estimate stops moving. The script divides by real elapsed time, so a late tick does not inflate the rate.</li>
+    <li>With zero traffic both rates decay to 0 and the ratio is 0/0; the script returns 0. Treat a ratio with rate below your volume guard as "unknown".</li>
+  </ul>
+  <h3>Write, per request</h3><div class=code><span class=lang>redis</span><button class=copy>Copy</button><pre><code># every request (no Lua)
+HINCRBY cnt:{stream} ok 1      # or: HINCRBY cnt:{stream} fail 1
+
+# leader election for the ticker, renewed every interval
+SET ticker:lock &lt;host-id&gt; NX PX &lt;2 × interval_ms&gt;</code></pre></div>
+  <h3>Tick, per stream every Δ</h3><div class=code><span class=lang>lua</span><button class=copy>Copy</button><pre><code>-- KEYS[1] = cnt:{stream}   KEYS[2] = ewma:{stream}   ARGV[1] = alpha   ARGV[2] = ttl (s)
+-- run by ONE ticker every interval, per stream. Divides by real elapsed time, so a late tick does not inflate the rate.
+local t = redis.call(&#x27;TIME&#x27;)
+local now = tonumber(t[1]) + tonumber(t[2]) / 1e6
+local alpha = tonumber(ARGV[1])
+local c = redis.call(&#x27;HMGET&#x27;, KEYS[1], &#x27;ok&#x27;, &#x27;fail&#x27;)
+redis.call(&#x27;DEL&#x27;, KEYS[1])
+local ok, fail = tonumber(c[1]) or 0, tonumber(c[2]) or 0
+local e = redis.call(&#x27;HMGET&#x27;, KEYS[2], &#x27;f&#x27;, &#x27;a&#x27;, &#x27;ts&#x27;)
+local last = tonumber(e[3])
+if last == nil then
+  redis.call(&#x27;HSET&#x27;, KEYS[2], &#x27;ts&#x27;, tostring(now))
+  redis.call(&#x27;EXPIRE&#x27;, KEYS[2], ARGV[2])
+  return nil
+end
+local dt = math.max(now - last, 0.001)
+local rf, ra = fail / dt, (ok + fail) / dt
+local ef, ea = tonumber(e[1]), tonumber(e[2])
+if ef == nil then ef, ea = rf, ra else ef = ef + alpha * (rf - ef); ea = ea + alpha * (ra - ea) end
+redis.call(&#x27;HSET&#x27;, KEYS[2], &#x27;f&#x27;, tostring(ef), &#x27;a&#x27;, tostring(ea), &#x27;ts&#x27;, tostring(now))
+redis.call(&#x27;EXPIRE&#x27;, KEYS[2], ARGV[2])
+return { tostring(ea &gt; 0 and ef / ea or 0), tostring(ea), tostring(ef) }</code></pre></div>
+  <p class=note>Read: <code>HMGET ewma:{stream} f a</code>, ratio = <code>f / a</code>.</p>
+
+  <h2 id="h-d">D. Sliding window, sorted set</h2>
+  <p>Every request becomes a sorted-set member scored by its timestamp. Exact counts over the last W seconds, and the simplest to explain in a postmortem. Memory and work grow with traffic: at 1,000 requests/s and W = 60 s that is 60,000 members (~7 MB) per stream, and a hot stream's trims and counts get slower as the set grows.</p>
+  <ul><li>The member must be unique per request (request id), or same-millisecond requests overwrite each other.</li>
+      <li>Failures go into a second set so the read is two <code>ZCOUNT</code>s, not a scan.</li></ul>
+  <h3>Write</h3><div class=code><span class=lang>lua</span><button class=copy>Copy</button><pre><code>-- KEYS[1] = sw:all:{stream}   KEYS[2] = sw:fail:{stream}
+-- ARGV[1] = 1 if failure else 0   ARGV[2] = W (s)   ARGV[3] = unique request id
+local t = redis.call(&#x27;TIME&#x27;)
+local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+local wms = tonumber(ARGV[2]) * 1000
+local function add(key)
+  redis.call(&#x27;ZADD&#x27;, key, now, ARGV[3])
+  redis.call(&#x27;ZREMRANGEBYSCORE&#x27;, key, &#x27;-inf&#x27;, now - wms)
+  redis.call(&#x27;PEXPIRE&#x27;, key, wms)
+end
+add(KEYS[1])
+if ARGV[1] == &#x27;1&#x27; then add(KEYS[2]) end
+return 1</code></pre></div>
+  <h3>Read</h3><div class=code><span class=lang>lua</span><button class=copy>Copy</button><pre><code>-- KEYS[1] = sw:all:{stream}   KEYS[2] = sw:fail:{stream}   ARGV[1] = W (s)
+-- returns { error_ratio, requests_per_s, failures_per_s }
+local t = redis.call(&#x27;TIME&#x27;)
+local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+local from = &#x27;(&#x27; .. (now - tonumber(ARGV[1]) * 1000)
+local a = redis.call(&#x27;ZCOUNT&#x27;, KEYS[1], from, &#x27;+inf&#x27;)
+local f = redis.call(&#x27;ZCOUNT&#x27;, KEYS[2], from, &#x27;+inf&#x27;)
+local w = tonumber(ARGV[1])
+return { tostring(a &gt; 0 and f / a or 0), tostring(a / w), tostring(f / w) }</code></pre></div>
+
+  <h2 id="h-e">E. Sliding window, bucketed counters</h2>
+  <p>One counter key per time bucket, expiring on its own. Memory is fixed (2·W/bucket keys per stream), writes are plain commands, but every read fetches every bucket. With W = 60 s and 1 s buckets that is a 120-key MGET per read, which hurts if you read on every request.</p>
+  <ul><li>Bucket ids come from the app clock; keep bucket width well above clock skew (NTP: ~ms, so ≥ 1 s is safe).</li>
+      <li>The current bucket is partial, so the window is really W − bucket to W. Smaller buckets fix that at the cost of more keys.</li></ul>
+  <div class=code><span class=lang>redis</span><button class=copy>Copy</button><pre><code># client side, pipelined (no Lua). b = floor(now_ms / bucket_ms), k = W / bucket
+INCR   sw:{stream}:a:&lt;b&gt;
+EXPIRE sw:{stream}:a:&lt;b&gt; &lt;W + bucket&gt;
+# on failure only:
+INCR   sw:{stream}:f:&lt;b&gt;
+EXPIRE sw:{stream}:f:&lt;b&gt; &lt;W + bucket&gt;
+
+# read: one MGET of 2k keys (same hash tag, so one slot in cluster)
+MGET sw:{stream}:a:&lt;b-k+1&gt; ... sw:{stream}:a:&lt;b&gt;  sw:{stream}:f:&lt;b-k+1&gt; ... sw:{stream}:f:&lt;b&gt;
+# ratio = Σf / Σa ; rate = Σa / W   (missing keys = 0)</code></pre></div>
+
+  <h2 id="h-f">F. Per-event fixed α <span class="pill no">avoid</span></h2>
+  <p>Ignores time: memory is about 1/α <i>requests</i>, not seconds. At peak traffic it reacts in milliseconds and at night in minutes, so one threshold cannot work for both. Listed for completeness.</p>
+  <div class=code><span class=lang>lua</span><button class=copy>Copy</button><pre><code>-- KEYS[1] = a:{stream}   ARGV[1] = 1 if failure else 0   ARGV[2] = alpha   ARGV[3] = ttl (s)
+local v = tonumber(redis.call(&#x27;GET&#x27;, KEYS[1]))
+local x = tonumber(ARGV[1])
+if v == nil then v = x else v = v + tonumber(ARGV[2]) * (x - v) end
+redis.call(&#x27;SET&#x27;, KEYS[1], tostring(v), &#x27;EX&#x27;, ARGV[3])
+return tostring(v)</code></pre></div>
+
+  <h2 id="h-tau">Choosing τ</h2>
+  <p>For A, B and C, when the true error ratio jumps from p₀ to p₁, the estimate crosses a threshold θ after</p>
+  <p class=formula>t = τ · ln( (p₁ − p₀) / (p₁ − θ) )</p>
+  <p>Example: τ = 10 s, a jump from 1% to 50% errors and a 25% threshold → t = 10 · ln(0.49 / 0.25) ≈ <b>6.7 s</b>. Smaller τ trips faster but is noisier at low traffic; use the simulator's error chart to see the noise floor at your real request rate.</p>
+
+  <h2 id="h-scale">Scaling</h2>
+  <ul>
+    <li><b>Pre-aggregate per host.</b> Count locally and flush every 100–250 ms with one A-script call carrying the counts. Redis load becomes hosts × flushes/s per stream, independent of traffic. With flush interval ≪ τ the accuracy loss is negligible.</li>
+    <li><b>Reads are often the bigger cost.</b> A breaker that checks Redis on every request doubles the round trips. Cache the decision per host for ~100 ms, or read it back from the flush call (the A script already returns the ratio).</li>
+    <li><b>Total load</b> ≈ streams × (writes/s + reads/s) per stream. The Cost vs accuracy table on the Simulator tab computes this for your numbers.</li>
+  </ul>
+  <div class=code><span class=lang>go</span><button class=copy>Copy</button><pre><code>// Per host, per stream: accumulate for flushEvery, then one script call.
+// Redis load becomes hosts × (1/flushEvery) per stream, independent of traffic.
+type counter struct{ fail, total atomic.Int64 }
+
+func (c *counter) flush(ctx context.Context, rdb redis.Scripter, stream string) {
+	n, f := c.total.Swap(0), c.fail.Swap(0)
+	if n == 0 {
+		return
+	}
+	_ = recordErr.Run(ctx, rdb, key(stream), f, n, tau, ttl).Err()
+}</code></pre></div>
+
+  <h2>Tests to write</h2>
+  <ol>
+    <li><b>Steady state:</b> 90 successes + 10 failures/s for 5τ → ratio ≈ 0.10, rate ≈ 100/s (within 5%).</li>
+    <li><b>Silence:</b> stop traffic for 2τ → ratio unchanged, rate ≈ 100 · e^(−2) ≈ 13.5/s.</li>
+    <li><b>Step:</b> jump to 50% errors → crosses 25% at the time the τ formula predicts (±20% for Poisson noise).</li>
+    <li><b>Cold start / TTL expiry:</b> one failure on an empty key → ratio 100% but rate ≈ 1/τ, so the volume guard blocks a trip.</li>
+    <li><b>Concurrency:</b> N goroutines recording in parallel → same totals as sequential (scripts are atomic).</li>
+    <li><b>Failover:</b> flush the script cache (<code>SCRIPT FLUSH</code>) → next call still succeeds via the EVAL fallback.</li>
+  </ol>
+  </div>
+</article>
+<script>
+const pick = (sig, f, a) => f === null ? NaN : sig === 'fail' ? f : sig === 'ok' ? a - f : sig === 'all' ? a : a > 0 ? f / a : NaN;
+const SIGNAL = { label: 'signal', options: ['ratio', 'fail', 'ok', 'all'], v: 'fail', help: '<b>signal — what the estimator reports</b>\n<b>ratio</b>: failures / total, shown on the error-ratio chart.\n<b>fail</b>, <b>ok</b>, <b>all</b>: events per second of that type, shown on the rate chart.' };
+const TAGS = { 'per-event': 'Updates on every observation. No background goroutine.', ticker: 'Updates on a fixed clock. Needs a background ticker.', baseline: 'Not an EWMA. Exact reference to compare against.' };
+const kindOf = p => p.signal === undefined || p.signal === 'ratio' ? 'ratio' : 'rate';
+
+// Redis cost per stream per second. okEv/failEv/read/extra are [rtt, cmds, work]; x = { ok, fail, reads } per second.
+const cost = (x, okEv, failEv, read, extra = [0, 0, 0]) => {
+  const o = [0, 1, 2].map(k => x.ok * okEv[k] + x.fail * failEv[k] + x.reads * read[k] + extra[k]);
+  return { rtt: o[0], cmds: o[1], work: o[2] };
+};
+const lg = n => Math.log2(Math.max(2, n));
+
+// Adapter contract: { id, label, desc, params, hint(p, rps), redis(p, x) -> { how, ticker, mem, rtt, cmds, work }, create(p) -> { observe(t, ok), read(t) } }.
+// p is live: slider changes mutate it and take effect on the next observe/read.
+const ADAPTERS = [
+  { id: 'event-tau', label: 'Per-event time-decayed', tag: 'per-event', formula: 'v += (1 − e^(−Δt/τ)) · (x − v)', desc: 'Weights each observation by the time since the last one. Freezes when traffic stops, which is right for a level.',
+    params: { tau: { label: 'τ (s)', min: .1, max: 60, step: .1, v: 5, help: '<b>τ (tau) — time constant, seconds</b>\nAn observation τ seconds old keeps e^−1 ≈ 37% of its weight; 2τ old keeps 14%.\nBigger τ = smoother but slower to react. Half-life = τ · ln2 ≈ 0.69τ.' } },
+    hint: p => `half-life <b>${(p.tau * Math.LN2).toFixed(1)}s</b> · ~95% settled after <b>${(3 * p.tau).toFixed(1)}s</b>`,
+    redis: (p, x) => ({ how: 'event: EVALSHA { HMGET v,ts ; HSET v,ts ; EXPIRE }\nread:  HGET v', ticker: false, mem: 120, ...cost(x, [1, 3, 5], [1, 3, 5], [1, 1, 1]) }),
+    create(p) { let v = null, last = 0;
+      return { observe(t, ok) { const x = ok ? 0 : 1; v = v === null ? x : v + (1 - Math.exp(-(t - last) / p.tau)) * (x - v); last = t; },
+               read() { return v ?? NaN; } }; } },
+
+  { id: 'event-count', label: 'Per-event fixed α', tag: 'per-event', formula: 'v += α · (x − v)', desc: 'Ignores time. Memory is ~1/α events, so reaction time scales with traffic: fast at 1000 rps, glacial at 1 rps.',
+    params: { alpha: { label: 'α', min: .0005, max: .5, step: .0005, v: .01, help: '<b>α (alpha) — smoothing factor, 0 to 1</b>\nWeight given to each new observation. 0.01 = each request moves the estimate 1% toward 0 or 1.\nMemory ≈ 1/α events, regardless of how much time they span.' } },
+    hint: (p, rps) => `memory ≈ <b>${Math.round(1 / p.alpha)} events</b> ≈ <b>${rps > 0 ? (1 / p.alpha / rps).toFixed(1) + 's' : '∞ (frozen)'}</b> at ${rps}/s`,
+    redis: (p, x) => ({ how: 'event: EVALSHA { GET v ; SET v EX ttl }\nread:  GET v', ticker: false, mem: 60, ...cost(x, [1, 2, 2], [1, 2, 2], [1, 1, 1]) }),
+    create(p) { let v = null;
+      return { observe(t, ok) { const x = ok ? 0 : 1; v = v === null ? x : v + p.alpha * (x - v); },
+               read() { return v ?? NaN; } }; } },
+
+  { id: 'tick', label: 'Fixed-tick', tag: 'ticker', formula: 'every Δ:  r = n/Δ;  v += α · (r − v)', desc: 'Needs a background ticker. Rates decay to 0 with no traffic; ratio becomes 0/0 and drops out.',
+    params: { interval: { label: 'interval (s)', min: .1, max: 10, step: .1, v: 1, help: '<b>interval Δ — tick period, seconds</b>\nEvents are counted in a bucket for Δ seconds; at each tick the bucket becomes one rate sample.\nThe estimate only changes on tick boundaries, so it is always up to Δ stale.' }, alpha: { label: 'α', min: .01, max: 1, step: .01, v: .2, help: '<b>α (alpha) — smoothing factor per tick, 0 to 1</b>\nWeight of each tick\'s rate sample. α = 1 means no smoothing (just the last interval).\nEquivalent τ ≈ −Δ / ln(1 − α).' }, signal: SIGNAL },
+    hint: p => p.alpha >= 1 ? `no smoothing: shows the last <b>${p.interval}s</b> only` : `equivalent τ ≈ <b>${(-p.interval / Math.log(1 - p.alpha)).toFixed(1)}s</b> · steps every <b>${p.interval}s</b>`,
+    redis: (p, x) => ({ how: 'event: HINCRBY cnt ok|fail 1\ntick:  EVALSHA { HMGET cnt ; DEL cnt ; HMGET ewma ; HSET ewma ; EXPIRE }  (leader only)\nread:  HMGET ewma f,a', ticker: true, mem: 150,
+      ...cost(x, [1, 1, 1], [1, 1, 1], [1, 1, 2], [1, 5, 10].map(v => v / p.interval)) }),
+    create(p) { let cf = 0, ca = 0, ef = null, ea = null, next = null;
+      const tick = t => { next ??= t + p.interval;
+        while (t >= next) { const rf = cf / p.interval, ra = ca / p.interval;
+          ef = ef === null ? rf : ef + p.alpha * (rf - ef); ea = ea === null ? ra : ea + p.alpha * (ra - ea);
+          cf = ca = 0; next += p.interval; } };
+      return { observe(t, ok) { tick(t); ca++; if (!ok) cf++; }, read(t) { tick(t); return pick(p.signal, ef, ea); } }; } },
+
+  { id: 'decay-rate', label: 'Decayed counts (recommended)', tag: 'per-event', formula: 'r = r · e^(−Δt/τ) + 1/τ', desc: 'A rate with no ticker: decay is applied lazily on each event and on read.',
+    params: { tau: { label: 'τ (s)', min: .1, max: 60, step: .1, v: 5, help: '<b>τ (tau) — time constant, seconds</b>\nEach event adds 1/τ to the counter, which decays by e^−1 every τ seconds.\nThe sum averages to the true events/s. Bigger τ = smoother, slower.' }, signal: { ...SIGNAL, v: 'ratio' } },
+    hint: p => `half-life <b>${(p.tau * Math.LN2).toFixed(1)}s</b> · decays to ~0 in <b>${(5 * p.tau).toFixed(1)}s</b> of silence`,
+    redis: (p, x) => ({ how: 'event: EVALSHA { HMGET f,a,ts ; HSET f,a,ts ; EXPIRE }\nread:  EVALSHA { HMGET f,a,ts }  (or HMGET f,a for ratio only)', ticker: false, mem: 144, ...cost(x, [1, 3, 7], [1, 3, 7], [1, 1, 3]) }),
+    create(p) { let f = 0, a = 0, last = 0;
+      const decay = t => { const k = Math.exp(-(t - last) / p.tau); f *= k; a *= k; last = t; };
+      return { observe(t, ok) { decay(t); a += 1 / p.tau; if (!ok) f += 1 / p.tau; }, read(t) { decay(t); return pick(p.signal, f, a); } }; } },
+
+  { id: 'window', label: 'Sliding window', tag: 'baseline', formula: 'v = Σ(last W s) / W', desc: 'Not an EWMA. zset: exact log of every event, memory grows with traffic × W. buckets: one counter key per bucket, constant memory but a read touches every bucket.',
+    params: { w: { label: 'W (s)', min: 1, max: 60, step: 1, v: 10, help: '<b>W — window length, seconds</b>\nThe estimate counts every event from the last W seconds equally; an event drops out exactly W seconds later.\nBigger W = smoother but slower to react (average lag W/2). For zset, memory grows with W.' },
+              impl: { label: 'redis impl', options: ['zset', 'buckets'], v: 'zset', help: '<b>How the window is stored in Redis</b>\n<b>zset</b>: every event is a sorted-set member scored by timestamp; old ones trimmed with ZREMRANGEBYSCORE. Exact, but memory = traffic × W.\n<b>buckets</b>: one counter key per time bucket with a TTL; read sums all buckets with MGET. Fixed memory, approximate edge.' },
+              bucket: { label: 'bucket (s)', min: .1, max: 10, step: .1, v: 1, help: '<b>bucket — bucket width, seconds</b>\nFor the buckets impl: events are counted per bucket of this width.\nSmaller = sharper window edge but more keys per read (2 × W / bucket). Ignored for zset.' },
+              signal: { ...SIGNAL, v: 'ratio' } },
+    hint: p => `average lag <b>${(p.w / 2).toFixed(1)}s</b> · full step response in <b>${p.w}s</b>` + (p.impl === 'buckets' ? ` · <b>${2 * Math.ceil(p.w / p.bucket)}</b> keys per read` : ''),
+    redis: (p, x) => {
+      if (p.impl === 'zset') {
+        const n = (x.ok + x.fail) * p.w, z = 2 * lg(n) + 1;
+        return { how: 'event: EVALSHA { ZADD all ; ZREMRANGEBYSCORE all ; PEXPIRE all }\n       (+ same on fail zset for failures)\nread:  EVALSHA { ZCOUNT all ; ZCOUNT fail }', ticker: false,
+          mem: (n + x.fail * p.w) * 120, ...cost(x, [1, 3, z + 1], [1, 6, 2 * z + 2], [1, 2, 2 * lg(n)]) };
+      }
+      const k = 2 * Math.ceil(p.w / p.bucket);
+      return { how: 'event: INCR all:<bucket> ; EXPIRE all:<bucket> W\n       (+ same on fail:<bucket> for failures)\nread:  MGET ' + k + ' bucket keys', ticker: false,
+        mem: k * 70, ...cost(x, [1, 2, 2], [1, 4, 4], [1, 1, k]) };
+    },
+    create(p) { const q = []; let f = 0, a = 0;
+      const size = () => p.impl === 'zset' ? .01 : p.bucket;
+      const trim = t => { while (q.length && q[0].s + size() / 2 <= t - p.w) { const x = q.shift(); f -= x.f; a -= x.a; } };
+      return { observe(t, ok) { const s = Math.floor(t / size()) * size(); let x = q[q.length - 1];
+                 if (!x || x.s !== s) q.push(x = { s, f: 0, a: 0 }); x.a++; a++; if (!ok) { x.f++; f++; } trim(t); },
+               read(t) { trim(t); return pick(p.signal, f / p.w, a / p.w); } }; } },
+];
+
+function defaults(def, over = {}) { const p = {}; for (const [k, s] of Object.entries(def.params)) p[k] = over[k] ?? s.v; return p; }
+
+// 120 s of 90 ok/s + 10 fail/s, evenly interleaved: every adapter must land within 10% of truth.
+function selfTest() {
+  for (const def of ADAPTERS) for (const sig of def.params.signal ? ['ratio', 'fail', 'all'] : ['ratio'])
+    for (const impl of def.params.impl ? def.params.impl.options : [undefined]) {
+      const p = defaults(def, { signal: sig, impl }), a = def.create(p), want = { ratio: .1, fail: 10, all: 100 }[sig];
+      let t = 0; for (let i = 0; i < 12000; i++) { t = i / 100; a.observe(t, i % 10 !== 0); }
+      const v = a.read(t);
+      console.assert(Math.abs(v - want) / want < .1, `${def.id}/${sig}/${impl}: got ${v}, want ${want}`);
+      const c = def.redis(p, { ok: 90, fail: 10, reads: 1 });
+      console.assert(c.cmds > 0 && c.rtt > 0 && c.mem > 0, `${def.id}: bad redis cost`);
+    }
+}
+selfTest();
+
+if (typeof document !== 'undefined') {
+const $ = s => document.querySelector(s);
+const WINDOW = 60, ERRW = 10, BIN = 0.5, PAL = ['#2a78d6', '#e0702e', '#2f9e5b', '#b04ac2', '#c9a227', '#d6455d', '#1aa3a3', '#7a6be0'];
+const S = { t: 0, ok: 90, fail: 10, reads: 1, readsPerReq: false, streams: 1, mode: 'poisson', speed: 1, paused: false, nOk: 0, nFail: 0, hist: [], raw: [], cur: null, script: [] };
+const insts = []; let colorIdx = 0;
+
+const gap = r => r <= 0 ? Infinity : S.mode === 'poisson' ? -Math.log(1 - Math.random()) / r : 1 / r;
+const resched = () => { S.nOk = S.t + gap(S.ok); S.nFail = S.t + gap(S.fail); };
+const human = v => !Number.isFinite(v) ? '—' : v >= 1e9 ? (v / 1e9).toFixed(1) + 'G' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : v.toFixed(v < 10 ? 1 : 0);
+const bytes = v => v >= 2 ** 30 ? (v / 2 ** 30).toFixed(1) + ' GB' : v >= 2 ** 20 ? (v / 2 ** 20).toFixed(1) + ' MB' : v >= 1024 ? (v / 1024).toFixed(1) + ' KB' : Math.round(v) + ' B';
+const fmt = (kind, v) => !Number.isFinite(v) ? '—' : kind === 'ratio' ? (v * 100).toFixed(2) + '%' : kind === 'cost' ? human(v) + '/s' : kind === 'err' ? (v * 100).toFixed(1) + '%' : v.toFixed(2) + '/s';
+const GLOSS = Object.fromEntries([...document.querySelectorAll('th .tip')].map(e => [{ 'RTT/s': 'rtt', 'cmds/s': 'cmds', 'work/s': 'work', memory: 'mem', ticker: 'ticker', MAE: 'mae', 'max err': 'max' }[e.textContent], e.dataset.tip.replace(/"/g, '&quot;')]));
+const pop = document.createElement('div'); pop.id = 'pop'; document.body.append(pop);
+let popEl = null;
+const showPop = el => {
+  popEl = el; pop.innerHTML = el.dataset.tip; pop.style.display = 'block';
+  const b = el.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  const top = b.bottom + 8 + h > innerHeight ? b.top - h - 8 : b.bottom + 8;
+  pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, b.left)) + 'px'; pop.style.top = Math.max(8, top) + 'px';
+};
+document.addEventListener('mouseover', e => { const el = e.target.closest('[data-tip]'); if (el) showPop(el); else if (popEl) { pop.style.display = 'none'; popEl = null; } });
+document.addEventListener('click', e => { const el = e.target.closest('[data-tip]'); if (!el) { pop.style.display = 'none'; popEl = null; } else if (el.closest('label') === null) showPop(el); });
+addEventListener('scroll', () => { pop.style.display = 'none'; popEl = null; }, true);
+const readRate = () => S.readsPerReq ? S.ok + S.fail : S.reads;
+const redisOf = i => i.def.redis(i.p, { ok: S.ok, fail: S.fail, reads: readRate() });
+
+function ctrl(label, s, on) {
+  const d = document.createElement('label'); d.className = 'ctrl';
+  d.innerHTML = `<span${s.help ? ` class=tip data-tip="${s.help}"` : ''}>${label}</span><input type=range min=${s.min} max=${s.max} step=${s.step} value=${s.v}><input type=number min=${s.min} step=${s.step} value=${s.v}>`;
+  const [r, n] = d.querySelectorAll('input');
+  const set = x => { x = +x; if (!Number.isFinite(x)) return; x = Math.max(s.min, x); r.value = n.value = x; on(x); };
+  r.oninput = () => set(r.value); n.onchange = () => set(n.value);
+  d.set = set;
+  return d;
+}
+function sel(label, options, v, on, help) {
+  const d = document.createElement('label'); d.className = 'ctrl';
+  d.innerHTML = `<span${help ? ` class=tip data-tip="${help}"` : ''}>${label}</span><select>${options.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
+  d.querySelector('select').onchange = e => on(e.target.value);
+  return d;
+}
+
+function addInst(id, over) {
+  const def = ADAPTERS.find(a => a.id === id), p = defaults(def, over);
+  const n = insts.filter(i => i.def === def).length + 1;
+  const inst = { def, p, name: def.label + (n > 1 ? ` #${n}` : ''), color: PAL[colorIdx++ % PAL.length], hist: [], cost: [], err: [], eq: [], se: 0, st: 0, impl: def.create(p) };
+  const el = document.createElement('div'); el.className = 'card'; el.style.setProperty('--c', inst.color);
+  el.innerHTML = `<div class=head><b>${def.label}${n > 1 ? `<small>#${n}</small>` : ''}</b><span class=val></span><button class=x title=Remove>×</button></div>
+    <div class=badges><span class=tip data-tip="${TAGS[def.tag]}">${def.tag}</span><span class="k tip" data-tip="<b>level</b>: a fraction (error ratio). Should hold its value when traffic stops.\n<b>rate</b>: events per second. Should fall to 0 when traffic stops."></span></div><code class=tip data-tip="<b>Symbols</b>\nv = current estimate\nx = 1 for a failure, 0 for a success\nΔt = seconds since the previous event\nτ (tau) = time constant\nα (alpha) = smoothing factor\nr = rate (events/s); n = events counted in the tick\nW = window length">${def.formula}</code><div class=params></div><div class=hint></div>
+    <div class=redis><div class="lbl tip" data-tip="<b>Redis cost for one stream</b> (one key, e.g. one merchant).\nThe table multiplies by the streams count.\n<b>EVALSHA</b> runs a cached Lua script atomically: one round trip, several commands.\n<b>HMGET/HSET</b> read/write hash fields; <b>ZADD/ZCOUNT</b> sorted-set ops; <b>INCR/MGET</b> plain counters.">Redis, per stream</div><code class=how></code><div class=live></div></div>
+    <details><summary>Behaviour</summary>${def.desc}</details>`;
+  const kindBadge = () => el.querySelector('.k').textContent = kindOf(p) === 'ratio' ? 'level · error ratio' : `rate · ${p.signal}/s`;
+  for (const [k, s] of Object.entries(def.params))
+    el.querySelector('.params').append(s.options ? sel(s.label, s.options, p[k], x => { p[k] = x; if (k === 'signal') Object.assign(inst, { hist: [], err: [], eq: [], se: 0, st: 0 }); kindBadge(); }, s.help)
+                                                 : ctrl(s.label, { ...s, v: p[k] }, x => p[k] = x));
+  kindBadge();
+  el.querySelector('.x').onclick = () => { insts.splice(insts.indexOf(inst), 1); el.remove(); };
+  Object.assign(inst, { val: el.querySelector('.val'), hint: el.querySelector('.hint'), how: el.querySelector('.how'), live: el.querySelector('.live') });
+  $('#cards').append(el); insts.push(inst);
+}
+
+function step(dt) {
+  const end = S.t + dt, ev = [];
+  while (S.nOk < end) { ev.push([S.nOk, true]); S.nOk += gap(S.ok); }
+  while (S.nFail < end) { ev.push([S.nFail, false]); S.nFail += gap(S.fail); }
+  ev.sort((a, b) => a[0] - b[0]);
+  for (const [t, ok] of ev) {
+    const b = Math.floor(t / BIN);
+    if (S.cur && S.cur.b !== b) { S.raw.push([(S.cur.b + 1) * BIN, S.cur.ok, S.cur.fail]); S.cur = null; }
+    S.cur ??= { b, ok: 0, fail: 0 }; ok ? S.cur.ok++ : S.cur.fail++;
+    for (const i of insts) i.impl.observe(t, ok);
+  }
+  S.t = end;
+  while (S.script.length && S.t >= S.script[0].t) { const x = S.script.shift(); setTraffic(x.ok, x.fail); }
+  S.hist.push([S.t, S.ok, S.fail]);
+  for (const i of insts) {
+    const v = i.impl.read(S.t), tr = truthOf(i);
+    i.hist.push([S.t, v]); i.cost.push([S.t, redisOf(i).cmds * S.streams]);
+    const e = Math.abs(v - tr);
+    if (Number.isFinite(e)) { i.eq.push([S.t, e, Math.abs(tr)]); i.se += e; i.st += Math.abs(tr); }
+    while (i.eq.length && i.eq[0][0] < S.t - ERRW) { const [, a, b] = i.eq.shift(); i.se -= a; i.st -= b; }
+    i.err.push([S.t, i.st > 1e-9 ? i.se / i.st : NaN]);
+  }
+  const cut = S.t - WINDOW;
+  for (const h of [S.hist, S.raw, ...insts.flatMap(i => [i.hist, i.cost, i.err])]) { let n = 0; while (n < h.length && h[n][0] < cut) n++; h.splice(0, n); }
+}
+
+function truthOf(i) { return pick(kindOf(i.p) === 'ratio' ? 'ratio' : i.p.signal, S.fail, S.ok + S.fail); }
+function errStats(i) {
+  const k = kindOf(i.p), sg = k === 'ratio' ? 'ratio' : i.p.signal, off = S.hist.length - i.hist.length;
+  let sum = 0, st = 0, n = 0, max = 0;
+  i.hist.forEach(([, v], j) => { const h = S.hist[j + off]; if (!h) return; const tr = pick(sg, h[2], h[1] + h[2]), e = Math.abs(v - tr);
+    if (Number.isFinite(e)) { sum += e; st += Math.abs(tr); n++; if (e > max) max = e; } });
+  const avgTr = n ? st / n : 0;
+  return { kind: k, rawMae: n ? sum / n : NaN, rawMax: n ? max : NaN, mae: avgTr > 1e-9 ? sum / st : NaN, max: avgTr > 1e-9 ? max / avgTr : NaN };
+}
+
+const hover = new Map();
+function draw(cv, kind) {
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const cs = getComputedStyle(document.documentElement), muted = cs.getPropertyValue('--muted').trim(), grid = cs.getPropertyValue('--grid').trim();
+  const L = 56, R = 44, T = 8, B = 20, t1 = Math.max(S.t, WINDOW), t0 = t1 - WINDOW;
+  const mine = kind === 'cost' || kind === 'err' ? insts : insts.filter(i => kindOf(i.p) === kind);
+  const ptsOf = i => kind === 'cost' ? i.cost : kind === 'err' ? i.err : i.hist;
+  const sigs = kind === 'ratio' ? ['ratio'] : kind === 'rate' ? [...new Set(mine.map(i => i.p.signal))] : [];
+  const series = [...sigs.map(sg => ({ c: muted, dash: true, label: sg, pts: S.hist.map(h => [h[0], pick(sg, h[2], h[1] + h[2])]) })),
+                  ...mine.map(i => ({ c: i.color, pts: ptsOf(i) }))];
+  const obs = kind === 'ratio' ? S.raw.map(([t, o, f]) => [t, f / (o + f)]) : [];
+  let max = 0; for (const [, v] of obs) if (Number.isFinite(v) && v > max) max = v;
+  for (const s of series) for (const [, v] of s.pts) if (Number.isFinite(v) && v > max) max = v;
+  const ymax = kind === 'ratio' ? Math.min(1, Math.max(.01, max * 1.2)) : kind === 'err' ? Math.max(.01, max * 1.15) : Math.max(1, max * 1.15);
+  const x = t => L + (t - t0) / WINDOW * (W - L - R), y = v => T + (1 - v / ymax) * (H - T - B);
+  g.font = '11px system-ui'; g.fillStyle = muted; g.strokeStyle = grid; g.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) { const v = ymax * k / 4; g.beginPath(); g.moveTo(L, y(v)); g.lineTo(W - R, y(v)); g.stroke();
+    g.textAlign = 'right'; g.fillText(fmt(kind, v), L - 6, y(v) + 4); }
+  g.textAlign = 'center';
+  for (let s = 0; s <= WINDOW; s += 10) g.fillText(`${Math.round(t0 + s)}s`, x(t0 + s), H - 4);
+  g.fillStyle = muted; g.globalAlpha = .45;
+  for (const [t, v] of obs) if (Number.isFinite(v) && t >= t0) { g.beginPath(); g.arc(x(t), y(v), 2, 0, 7); g.fill(); }
+  g.globalAlpha = 1;
+  for (const s of series) {
+    g.strokeStyle = s.c; g.lineWidth = s.dash ? 1.25 : 1.75; g.setLineDash(s.dash ? [5, 4] : []); g.beginPath();
+    let pen = false; for (const [t, v] of s.pts) { if (!Number.isFinite(v)) { pen = false; continue; } pen ? g.lineTo(x(t), y(v)) : g.moveTo(x(t), y(v)); pen = true; }
+    g.stroke();
+    const lp = s.pts[s.pts.length - 1];
+    if (s.dash && lp && Number.isFinite(lp[1])) { g.textAlign = 'left'; g.fillStyle = muted; g.fillText(s.label, x(lp[0]) + 4, y(lp[1]) + 4); }
+  }
+  g.setLineDash([]);
+  const hx = hover.get(cv), tt = cv.parentElement.querySelector('.tt');
+  if (hx === undefined || hx < L || hx > W - R) { tt.style.display = 'none'; return; }
+  const ht = t0 + (hx - L) / (W - L - R) * WINDOW;
+  g.strokeStyle = muted; g.lineWidth = 1; g.beginPath(); g.moveTo(hx, T); g.lineTo(hx, H - B); g.stroke();
+  const at = pts => { let best; for (const p of pts) if (!best || Math.abs(p[0] - ht) < Math.abs(best[0] - ht)) best = p; return best ? best[1] : NaN; };
+  const rows = [...sigs.map(sg => ['truth ' + sg, muted, at(series.find(s => s.label === sg).pts)]), ...(obs.length ? [[`observed (${BIN}s bin)`, muted, at(obs)]] : []),
+                ...mine.map(i => [i.name, i.color, at(ptsOf(i))])];
+  tt.innerHTML = `<div class=h>t = ${ht.toFixed(1)}s</div>` + rows.map(([n, c, v]) => `<div><span><i style="background:${c}"></i>${n}</span><b>${fmt(kind, v)}</b></div>`).join('');
+  tt.style.display = 'block';
+  const left = cv.offsetLeft + hx + 14, w = tt.offsetWidth;
+  tt.style.left = (left + w > cv.offsetLeft + W ? left - w - 28 : left) + 'px';
+  tt.style.top = (cv.offsetTop + 10) + 'px';
+}
+for (const cv of document.querySelectorAll('canvas')) {
+  cv.insertAdjacentHTML('afterend', '<div class=tt></div>');
+  cv.onmousemove = e => hover.set(cv, e.offsetX);
+  cv.onmouseleave = () => hover.delete(cv);
+}
+
+function legend(el, kind) {
+  const mine = kind === 'cost' || kind === 'err' ? insts : insts.filter(i => kindOf(i.p) === kind);
+  const h = mine.map(i => `<span><i style="background:${i.color}"></i>${i.name}${kind === 'rate' ? ` (${i.p.signal})` : ''}</span>`).join('') || '<span>no estimators on this chart</span>';
+  const html = (kind === 'ratio' ? `<span><i style="background:var(--muted);width:6px;height:6px;border-radius:50%"></i>observed, per ${BIN}s</span>` : '') + h;
+  if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+}
+
+function table() {
+  const rows = insts.map(i => { const r = redisOf(i), e = errStats(i);
+    i.redisHow = r.how;
+    return { i, rtt: r.rtt * S.streams, cmds: r.cmds * S.streams, work: r.work * S.streams, mem: r.mem * S.streams, ticker: r.ticker, ...e }; });
+  const cols = ['rtt', 'cmds', 'work', 'mem'];
+  const ext = Object.fromEntries(cols.map(c => { const v = rows.map(r => r[c]); return [c, [Math.min(...v), Math.max(...v)]]; }));
+  const errExt = c => { const v = rows.map(o => o[c]).filter(Number.isFinite); return [Math.min(...v), Math.max(...v)]; };
+  const cls = (v, [lo, hi], n) => n < 2 || lo === hi ? '' : v === lo ? 'best' : v === hi ? 'worst' : '';
+  const n = S.streams, ns = `${n} stream${n > 1 ? 's' : ''}`;
+  const tipOf = (r, c) => {
+    const ps = c === 'mem' ? bytes(r[c] / n) : human(r[c] / n), tot = c === 'mem' ? bytes(r[c]) : human(r[c]);
+    return `${GLOSS[c]}\n\n<b>This row:</b> ${ps} per stream × ${ns} = <b>${tot}</b>` +
+      (c === 'mem' && r.i.def.id === 'window' && r.i.p.impl === 'zset' ? `\n= ${S.ok + S.fail} events/s × ${r.i.p.w}s window (+ fail set) × ~120 B` : '') +
+      (c === 'rtt' ? `\n= (${S.ok} ok + ${S.fail} fail events + ${readRate()} reads)/s${r.ticker ? ` + 1/${r.i.p.interval}s ticks` : ''}, per stream` : '');
+  };
+  const errTip = (r, c) => `${GLOSS[c]}\n\n<b>This row:</b> ${fmt('err', r[c])} of truth = ${fmt(r.kind, c === 'mae' ? r.rawMae : r.rawMax)} raw (${r.kind === 'ratio' ? 'percentage points of error ratio' : 'events/s'}), truth now ${fmt(r.kind, truthOf(r.i))}`;
+  const html = rows.map(r => `<tr><td data-tip="<b>${r.i.name}</b>\n${r.i.redisHow.replace(/"/g, '&quot;')}"><i style="background:${r.i.color}"></i>${r.i.name}${r.i.def.id === 'window' ? ` <span class=stat>(${r.i.p.impl})</span>` : ''}</td>` +
+    cols.map(c => `<td data-tip="${tipOf(r, c)}" class="${cls(r[c], ext[c], rows.length)}">${c === 'mem' ? bytes(r[c]) : human(r[c])}</td>`).join('') +
+    `<td data-tip="${r.ticker ? `Runs a background tick every ${r.i.p.interval}s for each of ${ns}: ${human(n / r.i.p.interval)} tick scripts/s even with zero traffic.` : 'Updates only when an event or read arrives. No background job.'}">${r.ticker ? 'yes' : '—'}</td>` +
+    ['mae', 'max'].map(c => `<td data-tip="${errTip(r, c)}" class="${cls(r[c], errExt(c), rows.length)}">${fmt('err', r[c])}</td>`).join('') + '</tr>').join('');
+  const body = $('#costBody'); if (body.dataset.h !== html) { body.dataset.h = html; body.innerHTML = html; }
+}
+
+let prev = performance.now(), lastTable = -Infinity;
+function frame(now) {
+  const dt = Math.min(now - prev, 100) / 1000 * S.speed; prev = now;
+  if (!S.paused && dt > 0) step(dt);
+  for (const i of insts) {
+    const h = i.hist[i.hist.length - 1], k = kindOf(i.p), v = h ? h[1] : NaN, tr = pick(k === 'ratio' ? 'ratio' : i.p.signal, S.fail, S.ok + S.fail);
+    i.val.textContent = fmt(k, v);
+    const d = v - tr, off = !Number.isFinite(d) ? '—' : k === 'ratio' ? `${d >= 0 ? '+' : ''}${(d * 100).toFixed(2)}pp` : `${d >= 0 ? '+' : ''}${d.toFixed(2)}/s`;
+    i.hint.innerHTML = `${i.def.hint(i.p, S.ok + S.fail)}<br><span class=tip data-tip="How far this estimate is from the true configured value right now.\n<b>pp</b> = percentage points: 12% vs 10% is +2pp.">vs truth</span> ${fmt(k, tr)}: <b>${off}</b>`;
+    const r = redisOf(i);
+    if (i.how.textContent !== r.how) i.how.textContent = r.how;
+    const live = `<b>${human(r.rtt)}</b> <span class=tip data-tip="${GLOSS.rtt}">RTT/s</span> · <b>${human(r.cmds)}</b> <span class=tip data-tip="${GLOSS.cmds}">cmds/s</span> · <b>${human(r.work)}</b> <span class=tip data-tip="${GLOSS.work}">work/s</span> · <b>${bytes(r.mem)}</b>${r.ticker ? ' · needs ticker' : ''}`;
+    if (i.live.dataset.h !== live) { i.live.dataset.h = live; i.live.innerHTML = live; }
+  }
+  if (now - lastTable > 250) { table(); lastTable = now; }
+  $('#truthRatio').textContent = 'truth ' + fmt('ratio', pick('ratio', S.fail, S.ok + S.fail));
+  $('#truthRate').textContent = `truth ${S.fail}/s fail · ${S.ok}/s ok`;
+  $('#costScope').textContent = `${S.streams} stream${S.streams > 1 ? 's' : ''} · ${S.ok + S.fail} events/s each · ${readRate()} reads/s each`;
+  $('#costTotal').textContent = `${S.streams} stream${S.streams > 1 ? 's' : ''}`;
+  $('#clock').textContent = `t = ${S.t.toFixed(1)}s` + (S.script.length ? ` · ${S.script[0].label} in ${(S.script[0].t - S.t).toFixed(1)}s` : '');
+  draw($('#cvRatio'), 'ratio'); draw($('#cvRate'), 'rate'); draw($('#cvCost'), 'cost'); draw($('#cvErr'), 'err');
+  legend($('#lgRatio'), 'ratio'); legend($('#lgRate'), 'rate'); legend($('#lgCost'), 'cost'); legend($('#lgErr'), 'err');
+  requestAnimationFrame(frame);
+}
+
+const okCtrl = ctrl('success/s', { min: 0, max: 1000, step: 1, v: S.ok, help: 'Successful requests per second, per stream, fed to every estimator.' }, v => { S.ok = v; resched(); });
+const failCtrl = ctrl('failure/s', { min: 0, max: 1000, step: 1, v: S.fail, help: 'Failed requests per second, per stream. True error ratio = failure / (success + failure).' }, v => { S.fail = v; resched(); });
+$('#inputs').append(okCtrl, failCtrl);
+const setTraffic = (ok, fail) => { okCtrl.set(ok); failCtrl.set(fail); };
+const readsCtrl = ctrl('reads/s', { min: 0, max: 1000, step: 1, v: S.reads, help: 'How often each stream\'s estimate is read from Redis (e.g. a poller, or a breaker check).' }, v => S.reads = v);
+const perReq = document.createElement('label'); perReq.className = 'chk';
+perReq.innerHTML = `<input type=checkbox><span class=tip data-tip="Read the estimate on every request, like a circuit breaker deciding whether to allow the call. Overrides reads/s.">reads = traffic</span>`;
+perReq.querySelector('input').onchange = e => { S.readsPerReq = e.target.checked; readsCtrl.style.opacity = S.readsPerReq ? .4 : 1; };
+const streamsCtrl = ctrl('streams', { min: 1, max: 100000, step: 1, v: S.streams, help: 'Number of independent keys tracked (e.g. merchants × gateways). Multiplies Redis ops and memory; the charts above show one stream.' }, v => S.streams = Math.round(v));
+$('#load').append(readsCtrl, streamsCtrl, perReq);
+const setPerReq = on => { const c = perReq.querySelector('input'); c.checked = on; c.onchange({ target: c }); };
+
+// reset: false keeps history, so the effect of the change is visible against what came before.
+const PRESETS = [
+  { name: '500 rps · 10% errors · read every request', tip: '450 ok + 50 fail per second on one stream; the estimate is read on every request, like a circuit breaker.', ok: 450, fail: 50, perReq: true, streams: 1 },
+  { name: '1000 rps · 1% errors · read every request', tip: 'A healthy, busy stream: 990 ok + 10 fail per second, read on every request.', ok: 990, fail: 10, perReq: true, streams: 1 },
+  { name: 'Spike: 500 rps, 1% → 50% for 10 s', tip: '500 rps at 1% errors; after 10 s errors jump to 50% for 10 s, then recover. Watch which estimators cross 25% first and which recover fastest (max err).', ok: 495, fail: 5, perReq: true, streams: 1,
+    script: [{ at: 10, ok: 250, fail: 250, label: '50% errors' }, { at: 20, ok: 495, fail: 5, label: 'back to 1%' }] },
+  { name: 'Low traffic: 5 rps · 20% errors', tip: '4 ok + 1 fail per second, read once per second. Shows noise and why a minimum-volume guard matters.', ok: 4, fail: 1, perReq: false, reads: 1, streams: 1 },
+  { name: 'Traffic stops', tip: 'Drops traffic to 0 without resetting, so you can see levels freeze and rates decay against the previous run.', ok: 0, fail: 0, reset: false },
+  { name: 'Fleet: 10k streams × 100 rps · read every request', tip: '10,000 streams (e.g. merchants) each at 90 ok + 10 fail per second, read on every request. Look at the cost table: totals for the whole fleet.', ok: 90, fail: 10, perReq: true, streams: 10000 },
+];
+const presetBtns = PRESETS.map(p => {
+  const b = document.createElement('button'); b.textContent = p.name; b.dataset.tip = p.tip;
+  b.onclick = () => {
+    if (p.reset !== false) $('#reset').onclick();
+    S.script = (p.script || []).map(x => ({ ...x, t: S.t + x.at }));
+    setTraffic(p.ok, p.fail);
+    if (p.perReq !== undefined) setPerReq(p.perReq);
+    if (p.reads !== undefined) readsCtrl.set(p.reads);
+    if (p.streams !== undefined) streamsCtrl.set(p.streams);
+    for (const o of presetBtns) o.classList.toggle('on', o === b);
+    lastTable = -Infinity;
+  };
+  $('#presets').append(b); return b;
+});
+$('#mode').onchange = e => { S.mode = e.target.value; resched(); };
+$('#speed').onchange = e => S.speed = +e.target.value;
+$('#pause').onclick = e => { S.paused = !S.paused; e.target.textContent = S.paused ? 'Resume' : 'Pause'; };
+$('#reset').onclick = () => { S.t = 0; S.script = []; S.hist = []; S.raw = []; S.cur = null; for (const i of insts) { Object.assign(i, { hist: [], cost: [], err: [], eq: [], se: 0, st: 0 }); i.impl = i.def.create(i.p); } resched(); };
+$('#addSel').innerHTML = ADAPTERS.map(a => `<option value="${a.id}">${a.label}</option>`).join('');
+$('#addBtn').onclick = () => addInst($('#addSel').value);
+
+addInst('event-tau'); addInst('event-count'); addInst('window'); addInst('window', { impl: 'buckets' });
+addInst('tick'); addInst('decay-rate');
+resched(); requestAnimationFrame(frame);
+
+const go = h => {
+  const doc = h === 'handover' || h.startsWith('h-');
+  document.body.classList.toggle('handover', doc);
+  for (const a of document.querySelectorAll('nav.tabs a')) a.classList.toggle('on', (a.dataset.go === 'handover') === doc);
+  const el = h.startsWith('h-') && document.getElementById(h);
+  el ? el.scrollIntoView({ block: 'start' }) : scrollTo(0, 0);
+  try { history.replaceState(null, '', h ? '#' + h : location.pathname + location.search); } catch {}
+};
+document.addEventListener('click', e => { const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); go(a.dataset.go); } });
+document.addEventListener('keydown', e => { const a = e.target.closest?.('[data-go]'); if (a && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(a.dataset.go); } });
+let initial = ''; try { initial = location.hash.slice(1); } catch {}
+go(initial);
+for (const b of document.querySelectorAll('.doc .copy')) b.onclick = () => {
+  navigator.clipboard.writeText(b.parentElement.querySelector('code').textContent).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1200); });
+};
+}
+</script>
+</body>
+</html>
